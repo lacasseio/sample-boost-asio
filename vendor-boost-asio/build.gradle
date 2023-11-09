@@ -61,7 +61,7 @@ configurations {
                 attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, 'cplusplus-system-api'))
             }
             outgoing {
-                artifact(installTask.map { new File(it.temporaryDir, 'installed/x64-osx/include') }) {
+                artifact(installTask.map { new File(it.temporaryDir, 'vcpkg/installed/x64-osx/include') }) {
                     type(ArtifactTypeDefinition.DIRECTORY_TYPE)
                 }
             }

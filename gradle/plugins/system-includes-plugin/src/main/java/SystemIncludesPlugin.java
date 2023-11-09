@@ -6,13 +6,13 @@ import org.gradle.api.attributes.Attribute;
 import org.gradle.api.attributes.AttributeContainer;
 import org.gradle.api.attributes.Usage;
 import org.gradle.api.file.FileSystemLocation;
+import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.language.cpp.CppBinary;
 import org.gradle.language.cpp.tasks.CppCompile;
 import org.gradle.nativeplatform.toolchain.GccCompatibleToolChain;
 import org.gradle.nativeplatform.toolchain.NativeToolChain;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.List;
@@ -47,7 +47,7 @@ public abstract class SystemIncludesPlugin implements Plugin<Project> {
                 //   We could also use symbolic links to the target, if the files are resolved remotely by Gradle.
                 //   When Gradle resolves the files remotely, the include path will end up under the user home.
                 //   Alternatively, "vendor projects" could be created to sync the System headers under the multi-project and all paths are relativize to those projects (similar to what we do in this example).
-                task.getCompilerArgs().addAll(task.getToolChain().zip(systemHeaders.getElements(), toIncludeFlags(relativizeAgainst(project.getProjectDir()))));
+                task.getCompilerArgs().addAll(task.getToolChain().zip(systemHeaders.getElements(), toIncludeFlags(relativizeAgainst(task.getObjectFileDir().getLocationOnly().map(it -> it.getAsFile().toPath())))));
             });
 
             // Propagate the System headers/versions to downstream projects
@@ -57,8 +57,8 @@ public abstract class SystemIncludesPlugin implements Plugin<Project> {
     }
 
     //region Include flags
-    private static UnaryOperator<Path> relativizeAgainst(File projectDir) {
-        return it -> it.relativize(projectDir.toPath());
+    private static UnaryOperator<Path> relativizeAgainst(Provider<Path> projectDir) {
+        return it -> projectDir.get().relativize(it);
     }
 
     private static BiFunction<NativeToolChain, Set<FileSystemLocation>, List<String>> toIncludeFlags(UnaryOperator<Path> transform) {
