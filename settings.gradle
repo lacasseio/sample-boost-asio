@@ -1,0 +1,16 @@
+pluginManagement {
+    includeBuild 'gradle/plugins/system-includes-plugin'
+}
+
+rootProject.name = 'sample-boost-asio'
+
+include 'vendor-boost-asio'
+include 'chat-client'
+include 'chat-server'
+include 'chat-message'
+
+gradle.allprojects {
+    tasks.withType(CppCompile).configureEach { task ->
+        task.compilerArgs.add('-std=c++11')
+    }
+}

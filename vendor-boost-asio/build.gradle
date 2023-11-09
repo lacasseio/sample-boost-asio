@@ -1,0 +1,92 @@
+/**
+ * This project is simply serves to plug Boost:Asio into Gradle's dependency engine.
+ * It's a bare bone implementation and should not be used in production.
+ * The important aspect are the configuration of the SystemHeadersElements and SystemVersionsElements outgoing configuration.
+ */
+
+Action<ExecSpec> forwardOutputToConsole(Action<? super ExecSpec> configureAction) {
+    return {
+        configureAction.execute(it)
+        it.standardOutput = System.out
+        it.errorOutput = System.err
+    }
+}
+
+tasks.register('clean', Delete) {
+    delete('build')
+}
+
+def installTask = tasks.register("installBoostAsioViaVcpkg") {
+    doLast {
+        if (!new File(temporaryDir, 'vcpkg').exists()) {
+            exec(forwardOutputToConsole {
+                it.commandLine('git', 'clone', 'https://github.com/microsoft/vcpkg')
+                it.workingDir(temporaryDir)
+            })
+            exec(forwardOutputToConsole {
+                it.commandLine('./vcpkg/bootstrap-vcpkg.sh')
+                it.workingDir(temporaryDir)
+            })
+        }
+        exec(forwardOutputToConsole {
+            it.commandLine('./vcpkg/vcpkg', 'install', 'boost-asio')
+            it.workingDir(temporaryDir)
+        })
+    }
+}
+
+configurations {
+    all {
+        canBeConsumed = true
+        canBeResolved = false
+        attributes {
+            attribute(CppBinary.DEBUGGABLE_ATTRIBUTE, name.startsWith('debug'))
+            attribute(CppBinary.OPTIMIZED_ATTRIBUTE, name.startsWith('release'))
+            attribute(OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE, objects.named(OperatingSystemFamily, OperatingSystemFamily.MACOS))
+            attribute(MachineArchitecture.ARCHITECTURE_ATTRIBUTE, objects.named(MachineArchitecture, MachineArchitecture.X86_64))
+        }
+    }
+    ['debug', 'release'].each { buildType ->
+        create("${buildType}SystemVersionsElements") {
+            attributes {
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, 'cplusplus-system-api-version'))
+            }
+            outgoing {
+                // In this case, we use the vcpkg status file as it contains a good enough
+                artifact(installTask.map { new File(it.temporaryDir, 'vcpkg/installed/vcpkg/status') })
+            }
+        }
+        create("${buildType}SystemHeadersElements") {
+            attributes {
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, 'cplusplus-system-api'))
+            }
+            outgoing {
+                artifact(installTask.map { new File(it.temporaryDir, 'installed/x64-osx/include') }) {
+                    type(ArtifactTypeDefinition.DIRECTORY_TYPE)
+                }
+            }
+        }
+        create("${buildType}ApiElements") {
+            attributes {
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.C_PLUS_PLUS_API))
+            }
+        }
+
+        create("${buildType}LinkElements") {
+            attributes {
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.NATIVE_LINK))
+            }
+            outgoing {
+                ['chrono', 'container', 'context', 'coroutine', 'date_time', 'exception', 'regex', 'system'].each { libName ->
+                    artifact(installTask.map { new File(it.temporaryDir, "vcpkg/installed/x64-osx/lib/libboost_${libName}.a") })
+                }
+            }
+        }
+
+        create("${buildType}RuntimeElements") {
+            attributes {
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.NATIVE_RUNTIME))
+            }
+        }
+    }
+}

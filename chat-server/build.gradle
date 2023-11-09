@@ -1,0 +1,10 @@
+plugins {
+    id 'cpp-application'
+    id 'com.example.system-includes'
+}
+
+application {
+    dependencies {
+        implementation project(':chat-message')
+    }
+}
